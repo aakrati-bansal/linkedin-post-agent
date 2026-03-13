@@ -98,15 +98,25 @@ def _ask_groq(prompt: str) -> str:
 # return — send the clean post text back to whichever pipeline called this function — news, concept or tool spotlight.
 
 
-def run_news_pipeline(past_topics: str) -> dict:
-    print("\n🔍 Searching for AI news...")
-    search_results = _search("top AI news this week artificial intelligence")
+def run_news_pipeline(past_topics: str, manual_note: str = "") -> dict:
+    if manual_note:
+        print(f"\n📝 Using your note: {manual_note}")
 
-    pick_prompt = f"""
+        # Skip web search — write directly about what user mentioned
+        pick_response = f"""
+TOPIC: {manual_note}
+SUMMARY: The user has shared this news or development they came across this week. Write their personal take on it.
+KEYWORDS: AI, news, trends
+"""
+    else:
+        print("\n🔍 Searching for AI news...")
+        search_results = _search("top AI news this week artificial intelligence")
+
+        pick_prompt = f"""
 Here are recent AI news headlines and summaries:
 {search_results}
 
-Here are topics I've already covered. 
+Here are topics I've already covered.
 YOU MUST NOT pick any of these. If you do, you have failed your task:
 {past_topics}
 
@@ -118,14 +128,18 @@ TOPIC: [one line title]
 SUMMARY: [2-3 sentence summary]
 KEYWORDS: [3-5 comma-separated keywords]
 """
-    pick_response = _ask_groq(pick_prompt)
-    print(f"📌 Picked story:\n{pick_response}\n")
+        pick_response = _ask_groq(pick_prompt)
+        print(f"📌 Picked story:\n{pick_response}\n")
 
     write_prompt = f"""
 {VOICE_PROFILE}
 
 Write a LinkedIn post about this AI news story:
 {pick_response}
+
+IMPORTANT: If the user shared this news themselves, write from THEIR perspective —
+use "I came across", "I read about", "This caught my attention this week".
+Make it feel like their genuine reaction, not a news report.
 
 Structure:
 - Hook: One surprising opening line
@@ -166,11 +180,21 @@ Constraints:
 
 
 
-def run_concept_pipeline(past_topics: str) -> dict:
-    print("\n🔍 Searching for AI concepts...")
-    search_results = _search("AI concepts explained machine learning trends 2025")
+def run_concept_pipeline(past_topics: str, manual_note: str = "") -> dict:
+    if manual_note:
+        print(f"\n📝 Using your note: {manual_note}")
 
-    pick_prompt = f"""
+        # Skip the researcher step — write directly about what user mentioned
+        pick_response = f"""
+TOPIC: {manual_note}
+SUMMARY: The user wants to explain this concept from their own learning experience this week.
+KEYWORDS: AI, concepts, learning
+"""
+    else:
+        print("\n🔍 Searching for AI concepts...")
+        search_results = _search("AI concepts explained machine learning trends 2025")
+
+        pick_prompt = f"""
 Here are trending AI concepts:
 {search_results}
 
@@ -183,14 +207,18 @@ TOPIC: [concept name]
 SUMMARY: [what it is in 2-3 sentences]
 KEYWORDS: [3-5 comma-separated keywords]
 """
-    pick_response = _ask_groq(pick_prompt)
-    print(f"📌 Picked concept:\n{pick_response}\n")
+        pick_response = _ask_groq(pick_prompt)
+        print(f"📌 Picked concept:\n{pick_response}\n")
 
     write_prompt = f"""
 {VOICE_PROFILE}
 
 Write a LinkedIn post explaining this AI concept:
 {pick_response}
+
+IMPORTANT: If this is something the user learned or explored personally this week,
+write from THEIR perspective — use "I learned", "I explored", "I finally understood".
+Make it feel like a personal insight, not a textbook explanation.
 
 Structure:
 - Hook: A relatable analogy or question
@@ -213,12 +241,18 @@ Constraints:
 def run_tool_pipeline(past_topics: str, manual_note: str = "") -> dict:
     if manual_note:
         print(f"\n📝 Using your note: {manual_note}")
-        search_context = f"User's own experience: {manual_note}"
+
+        # Skip the researcher step — user already told us what to write about
+        pick_response = f"""
+TOPIC: {manual_note}
+SUMMARY: The user built or tried this themselves this week. Write the post from their personal experience.
+KEYWORDS: AI, personal project, buildinpublic
+"""
     else:
         print("\n🔍 Searching for AI tools...")
         search_context = _search("best new AI tools productivity 2025")
 
-    pick_prompt = f"""
+        pick_prompt = f"""
 Context about AI tools:
 {search_context}
 
@@ -231,20 +265,24 @@ TOPIC: [tool name]
 SUMMARY: [what it does and why it's interesting]
 KEYWORDS: [3-5 comma-separated keywords]
 """
-    pick_response = _ask_groq(pick_prompt)
-    print(f"📌 Picked tool:\n{pick_response}\n")
+        pick_response = _ask_groq(pick_prompt)
+        print(f"📌 Picked tool:\n{pick_response}\n")
 
     write_prompt = f"""
 {VOICE_PROFILE}
 
-Write a LinkedIn post about this AI tool:
+Write a LinkedIn post about this:
 {pick_response}
 
+IMPORTANT: If this is something the user built or tried personally, 
+write the post from THEIR experience — use "I built", "I tried", "I discovered".
+Make it personal and specific, not generic.
+
 Structure:
-- Hook: A problem this tool solves
-- What it does: 2-3 lines, plain English
-- How I'd use it: Personal angle
-- Who should check it out
+- Hook: A problem this solves or what made you try it
+- What it is: 2-3 lines, plain English
+- Your personal experience with it
+- Who else should check it out
 
 Constraints:
 - Max 200 words. No emojis. Max 3 hashtags at the end. First person.
@@ -283,3 +321,22 @@ def _extract_field(text: str, field: str) -> str:
 # return — hand back just the clean value to whoever called this function — in our case run_news_pipeline() which puts it in the dictionary
 # Step 7 → Safety net if nothing found
 # return "Unknown" — if the loop finishes without finding the field, return "Unknown" instead of crashing
+
+
+def classify_note(note: str) -> str:
+    if not note:
+        return None
+    
+    prompt = f"""
+    A user has provided this note: "{note}"
+    
+    Classify this note into exactly one of these three categories:
+    - News (if it's about a recent event, launch, or development)
+    - Concept (if it's about understanding or explaining something)
+    - Tool Spotlight (if it's about a tool, product or something they built)
+    
+    Reply with ONLY one of these three words: News, Concept, Tool Spotlight
+    """
+    
+    result = _ask_groq(prompt)
+    return result.strip()

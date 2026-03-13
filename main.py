@@ -8,7 +8,7 @@ from notion_client import Client as NotionClient
 # NotionClient — imports Client from notion but renames it to NotionClient so it's clearer what it does
 
 from memory import get_past_topics, log_post
-from agent import run_news_pipeline, run_concept_pipeline, run_tool_pipeline
+from agent import run_news_pipeline, run_concept_pipeline, run_tool_pipeline,classify_note
 
 # main.py starts
 #     ↓
@@ -63,7 +63,7 @@ def main():
         "--tool-note",
         type=str,
         default="",
-        help="Optional note about something you built this week"
+        help="Optional note about something you built or read this week"
     )
     args = parser.parse_args()
 
@@ -77,28 +77,68 @@ def main():
     past_topics = get_past_topics(limit=12)
     print(f"Found history:\n{past_topics}\n")
 
+    # Step 2 — Classify the note if provided
+    news_note = ""
+    concept_note = ""
+    tool_note = ""
+
+    if args.tool_note:
+        print(f"\n🧠 Classifying your note: '{args.tool_note}'")
+        note_type = classify_note(args.tool_note)
+        print(f"📌 Classified as: {note_type}")
+
+        if note_type == "News":
+            news_note = args.tool_note
+        elif note_type == "Concept":
+            concept_note = args.tool_note
+        elif note_type == "Tool Spotlight":
+            tool_note = args.tool_note
+        else:
+            print("⚠️ Could not classify your note into News, Concept or Tool Spotlight.")
+            print("Please try again with a clearer note.")
+            print("\nExamples:")
+            print("  News        → 'I read that OpenAI launched a new model this week'")
+            print("  Concept     → 'I finally understood how RAG works this week'")
+            print("  Tool        → 'I tried Cursor AI and it helped me code 2x faster'")
+
+            new_note = input("\n✏️  Enter a clearer note (or press Enter to skip): ").strip()
+
+            if new_note:
+                note_type = classify_note(new_note)
+                print(f"📌 Classified as: {note_type}")
+                if note_type == "News":
+                    news_note = new_note
+                elif note_type == "Concept":
+                    concept_note = new_note
+                elif note_type == "Tool Spotlight":
+                    tool_note = new_note
+                else:
+                    print("⚠️ Still unclear — running all 3 pipelines without a note.")
+            else:
+                print("⏭️ Skipping note — running all 3 pipelines normally.")
+
     results = []
 
-    # Step 2 — Run all 3 pipelines
+    # Step 3 — Run all 3 pipelines
     print("\n" + "─" * 60)
     print("📰 PIPELINE 1: News + Take")
     print("─" * 60)
-    news = run_news_pipeline(past_topics)
+    news = run_news_pipeline(past_topics, manual_note=news_note)
     results.append(news)
 
     print("\n" + "─" * 60)
     print("💡 PIPELINE 2: Concept Explainer")
     print("─" * 60)
-    concept = run_concept_pipeline(past_topics)
+    concept = run_concept_pipeline(past_topics, manual_note=concept_note)
     results.append(concept)
 
     print("\n" + "─" * 60)
     print("🔧 PIPELINE 3: Tool Spotlight")
     print("─" * 60)
-    tool = run_tool_pipeline(past_topics, manual_note=args.tool_note)
+    tool = run_tool_pipeline(past_topics, manual_note=tool_note)
     results.append(tool)
 
-    # Step 3 — Save to Notion + log to Sheet
+    # Step 4 — Save to Notion + log to Sheet
     print("\n" + "=" * 60)
     print("💾 Saving to Notion and logging to Google Sheet...")
     print("=" * 60)
@@ -112,7 +152,7 @@ def main():
             status="Draft"
         )
 
-    # Step 4 — Print all posts to terminal
+    # Step 5 — Print all posts to terminal
     print("\n" + "=" * 60)
     print("✨ THIS WEEK'S POSTS — REVIEW BEFORE PUBLISHING")
     print("=" * 60)
