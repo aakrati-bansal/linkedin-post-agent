@@ -326,17 +326,36 @@ def _extract_field(text: str, field: str) -> str:
 def classify_note(note: str) -> str:
     if not note:
         return None
-    
+
     prompt = f"""
-    A user has provided this note: "{note}"
-    
-    Classify this note into exactly one of these three categories:
-    - News (if it's about a recent event, launch, or development)
-    - Concept (if it's about understanding or explaining something)
-    - Tool Spotlight (if it's about a tool, product or something they built)
-    
-    Reply with ONLY one of these three words: News, Concept, Tool Spotlight
-    """
-    
+You are a strict classifier for a LinkedIn AI post generator.
+
+The user has provided this note: "{note}"
+
+Your job is to classify it into ONE of these three categories — BUT ONLY if it is clearly about AI or technology:
+- News → a recent AI/tech event, launch, announcement or development
+- Concept → understanding or explaining an AI/tech concept or idea
+- Tool Spotlight → an AI/tech tool, product or something they built
+
+STRICT RULES:
+- If the note has nothing to do with AI or technology → reply UNKNOWN
+- If the note is vague, personal or unrelated to AI → reply UNKNOWN
+- If you are not at least 80% confident → reply UNKNOWN
+- Do NOT try to force a category if it doesn't fit
+
+Reply with ONLY one of these four words: News, Concept, Tool Spotlight, UNKNOWN
+No explanation. No punctuation. Just the word.
+"""
+
     result = _ask_groq(prompt)
-    return result.strip()
+    
+    # Clean up response in case LLM adds extra text
+    result = result.strip()
+    if "News" in result:
+        return "News"
+    elif "Concept" in result:
+        return "Concept"
+    elif "Tool Spotlight" in result:
+        return "Tool Spotlight"
+    else:
+        return "UNKNOWN"
