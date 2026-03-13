@@ -1,6 +1,6 @@
 import streamlit as st
 import streamlit.components.v1 as components
-from agent import run_news_pipeline, run_concept_pipeline, run_tool_pipeline
+from agent import run_news_pipeline, run_concept_pipeline, run_tool_pipeline, classify_note
 
 st.set_page_config(
     page_title="LinkedIn AI Post Generator",
@@ -198,20 +198,47 @@ if st.button("✨ Generate This Week's Posts", use_container_width=True, type="p
     past_topics = "No past topics. This is a demo — pick any fresh interesting topic."
     results = []
 
+    # Classify the note if provided
+    news_note = ""
+    concept_note = ""
+    tool_note_classified = ""
+
+    if tool_note:
+        with st.spinner("🧠 Understanding your note..."):
+            note_type = classify_note(tool_note)
+
+        if note_type == "News":
+            st.success(f"📰 Got it — using your note for the News post")
+            news_note = tool_note
+        elif note_type == "Concept":
+            st.success(f"💡 Got it — using your note for the Concept post")
+            concept_note = tool_note
+        elif note_type == "Tool Spotlight":
+            st.success(f"🔧 Got it — using your note for the Tool Spotlight post")
+            tool_note_classified = tool_note
+        else:
+            st.warning("""
+            ⚠️ I couldn't classify your note clearly. Try something like:
+            - **News** → "I read that OpenAI launched a new model this week"
+            - **Concept** → "I finally understood how RAG works this week"  
+            - **Tool** → "I tried Cursor AI and it helped me code 2x faster"
+            """)
+            st.stop()
+
     progress = st.progress(0, text="Starting up...")
 
     with st.spinner("📰 Searching AI news and writing post 1 of 3..."):
-        news = run_news_pipeline(past_topics)
+        news = run_news_pipeline(past_topics, manual_note=news_note)
         results.append(news)
         progress.progress(33, text="Post 1 done...")
 
     with st.spinner("💡 Finding AI concept and writing post 2 of 3..."):
-        concept = run_concept_pipeline(past_topics)
+        concept = run_concept_pipeline(past_topics, manual_note=concept_note)
         results.append(concept)
         progress.progress(66, text="Post 2 done...")
 
     with st.spinner("🔧 Spotlighting AI tool and writing post 3 of 3..."):
-        tool = run_tool_pipeline(past_topics, manual_note=tool_note)
+        tool = run_tool_pipeline(past_topics, manual_note=tool_note_classified)
         results.append(tool)
         progress.progress(100, text="All 3 posts ready!")
 
