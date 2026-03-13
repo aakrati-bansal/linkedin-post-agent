@@ -60,7 +60,7 @@ with st.expander("⚙️ How does this work?", expanded=False):
     4. **Writes the post** — AI writer crafts it in your personal voice
     5. **Saves everything** — drafts go to Notion, topics logged to Google Sheet
 
-    **Tech used:** Python · Ollama (llama3.1) · Tavily Search · Notion API · Google Sheets API
+    **Tech used:** Python · Groq (llama3.1) · Tavily Search · Notion API · Google Sheets API
 
     **This is a demo version** — in the full version posts are saved to Notion
     and topics are tracked in Google Sheets so the agent never repeats itself.
@@ -126,17 +126,17 @@ with st.expander("⚙️ How does this work?", expanded=False):
     <line x1="340" y1="364" x2="340" y2="404" stroke="#888" stroke-width="1.5" marker-end="url(#arrow)"/>
     <line x1="545" y1="364" x2="545" y2="404" stroke="#888" stroke-width="1.5" marker-end="url(#arrow)"/>
 
-    <!-- Ollama row -->
+    <!-- Groq row -->
     <rect x="50" y="404" width="170" height="56" rx="8" fill="#faece7" stroke="#993c1d" stroke-width="0.5"/>
-    <text x="135" y="424" text-anchor="middle" dominant-baseline="central" font-family="sans-serif" font-size="14" font-weight="500" fill="#4a1b0c">Ollama (llama3.1)</text>
+    <text x="135" y="424" text-anchor="middle" dominant-baseline="central" font-family="sans-serif" font-size="14" font-weight="500" fill="#4a1b0c">Groq (llama3.1)</text>
     <text x="135" y="442" text-anchor="middle" dominant-baseline="central" font-family="sans-serif" font-size="12" fill="#993c1d">pick + write post</text>
 
     <rect x="255" y="404" width="170" height="56" rx="8" fill="#faece7" stroke="#993c1d" stroke-width="0.5"/>
-    <text x="340" y="424" text-anchor="middle" dominant-baseline="central" font-family="sans-serif" font-size="14" font-weight="500" fill="#4a1b0c">Ollama (llama3.1)</text>
+    <text x="340" y="424" text-anchor="middle" dominant-baseline="central" font-family="sans-serif" font-size="14" font-weight="500" fill="#4a1b0c">Groq (llama3.1)</text>
     <text x="340" y="442" text-anchor="middle" dominant-baseline="central" font-family="sans-serif" font-size="12" fill="#993c1d">pick + write post</text>
 
     <rect x="460" y="404" width="170" height="56" rx="8" fill="#faece7" stroke="#993c1d" stroke-width="0.5"/>
-    <text x="545" y="424" text-anchor="middle" dominant-baseline="central" font-family="sans-serif" font-size="14" font-weight="500" fill="#4a1b0c">Ollama (llama3.1)</text>
+    <text x="545" y="424" text-anchor="middle" dominant-baseline="central" font-family="sans-serif" font-size="14" font-weight="500" fill="#4a1b0c">Groq (llama3.1)</text>
     <text x="545" y="442" text-anchor="middle" dominant-baseline="central" font-family="sans-serif" font-size="12" fill="#993c1d">pick + write post</text>
 
     <!-- Merge arrows -->
@@ -193,37 +193,53 @@ tool_note = st.text_input(
     placeholder="e.g. I tried Cursor AI, it helped me write code 2x faster"
 )
 
+# ── Live Classification Preview ───────────────────────────
+if tool_note:
+    if "note_type" not in st.session_state or st.session_state.get("last_note") != tool_note:
+        with st.spinner("🧠 Classifying your note..."):
+            st.session_state.note_type = classify_note(tool_note)
+            st.session_state.last_note = tool_note
+
+    preview_type = st.session_state.note_type
+
+    if preview_type == "News":
+        st.info("📰 Your note will be used for the **News + Take** post. The Concept and Tool posts will find their own topics automatically.")
+    elif preview_type == "Concept":
+        st.info("💡 Your note will be used for the **Concept Explainer** post. The News and Tool posts will find their own topics automatically.")
+    elif preview_type == "Tool Spotlight":
+        st.info("🔧 Your note will be used for the **Tool Spotlight** post. The News and Concept posts will find their own topics automatically.")
+    else:
+        st.warning("""
+        ⚠️ I couldn't classify your note clearly. Try something like:
+        - **News** → "I read that OpenAI launched a new model this week"
+        - **Concept** → "I finally understood how RAG works this week"
+        - **Tool** → "I tried Cursor AI and it helped me code 2x faster"
+        """)
+
+# ── Generate Button ───────────────────────────────────────
 if st.button("✨ Generate This Week's Posts", use_container_width=True, type="primary"):
+
+    # Block generation if note exists but couldn't be classified
+    if tool_note and st.session_state.get("note_type") not in ["News", "Concept", "Tool Spotlight"]:
+        st.error("⚠️ Please fix your note before generating — it couldn't be classified into any post type.")
+        st.stop()
 
     past_topics = "No past topics. This is a demo — pick any fresh interesting topic."
     results = []
 
-    # Classify the note if provided
+    # Route note to correct pipeline
     news_note = ""
     concept_note = ""
     tool_note_classified = ""
 
     if tool_note:
-        with st.spinner("🧠 Understanding your note..."):
-            note_type = classify_note(tool_note)
-
+        note_type = st.session_state.get("note_type", "")
         if note_type == "News":
-            st.success(f"📰 Got it — using your note for the News post")
             news_note = tool_note
         elif note_type == "Concept":
-            st.success(f"💡 Got it — using your note for the Concept post")
             concept_note = tool_note
         elif note_type == "Tool Spotlight":
-            st.success(f"🔧 Got it — using your note for the Tool Spotlight post")
             tool_note_classified = tool_note
-        else:
-            st.warning("""
-            ⚠️ I couldn't classify your note clearly. Try something like:
-            - **News** → "I read that OpenAI launched a new model this week"
-            - **Concept** → "I finally understood how RAG works this week"  
-            - **Tool** → "I tried Cursor AI and it helped me code 2x faster"
-            """)
-            st.stop()
 
     progress = st.progress(0, text="Starting up...")
 
@@ -278,9 +294,9 @@ if st.button("✨ Generate This Week's Posts", use_container_width=True, type="p
     The full agent saves drafts to Notion, tracks history in Google Sheets
     and can be scheduled to run every Monday automatically.
 
-    Built with Python · Ollama · Tavily · Notion API · Google Sheets API
+    Built with Python · Groq · Tavily · Notion API · Google Sheets API
     """)
 
 # ── Page Footer ───────────────────────────────────────────
 st.divider()
-st.caption("Built by Aakrati Bansal · Powered by Ollama + Tavily · Not just ChatGPT 🤖")
+st.caption("Built by Aakrati Bansal · Powered by Groq + Tavily · Not just ChatGPT 🤖")
