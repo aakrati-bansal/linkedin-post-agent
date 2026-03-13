@@ -1,0 +1,8 @@
+anthropic
+tavily-python
+gspread
+google-auth
+notion-client
+python-dotenv
+groq
+streamlit
