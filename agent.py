@@ -22,11 +22,15 @@ groq_client = Groq(api_key=os.getenv("GROQ_API_KEY"))
 MODEL = "llama-3.1-8b-instant"
 
 def _search(query: str, max_results: int = 5) -> str:
-    results = tavily.search(query=query, max_results=max_results)
-    lines = []
-    for r in results.get("results", []):
-        lines.append(f"- {r['title']}: {r['content'][:300]}")
-    return "\n".join(lines)
+    try:
+        result = tavily.search(query, max_results=max_results)
+        l = []
+        for r in result.get("results", []):
+            l.append(f"{r.get('title', '')} - {r.get('content', '')}")
+        return "\n".join(l)
+    except Exception as e:
+        print(f"Search error: {e}")
+        return "Could not fetch search results. Please try again."
 
 # Step 1 → Receive the search query and limit
 # query is what to search for, max_results=5 is how many results to fetch. Default is 5 because we don't need millions of results — just enough for Claude to pick from.

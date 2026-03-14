@@ -242,16 +242,21 @@ if st.button("✨ Generate This Week's Posts", use_container_width=True, type="p
             tool_note_classified = tool_note
 
     progress = st.progress(0, text="Starting up...")
-
+        
     with st.spinner("📰 Searching AI news and writing post 1 of 3..."):
-        news = run_news_pipeline(past_topics, manual_note=news_note)
-        results.append(news)
-        progress.progress(33, text="Post 1 done...")
+        try:
+            news = run_news_pipeline(past_topics, manual_note=news_note)
+            results.append(news)
+            progress.progress(33, text="Post 1 done...")
+        except Exception as e:
+            st.warning("⚠️ Had trouble connecting — please try again in a moment.")
+            st.stop()
 
     with st.spinner("💡 Finding AI concept and writing post 2 of 3..."):
         concept = run_concept_pipeline(past_topics, manual_note=concept_note)
         results.append(concept)
         progress.progress(66, text="Post 2 done...")
+        
 
     with st.spinner("🔧 Spotlighting AI tool and writing post 3 of 3..."):
         tool = run_tool_pipeline(past_topics, manual_note=tool_note_classified)
