@@ -220,7 +220,7 @@ if tool_note:
 if st.button("✨ Generate This Week's Posts", use_container_width=True, type="primary"):
 
     # Block generation if note exists but couldn't be classified
-    if tool_note and st.session_state.get("note_type") not in ["News", "Concept", "Tool Spotlight"]:
+    if tool_note and st.session_state.get("note_type", "UNKNOWN") not in ["News", "Concept", "Tool Spotlight"]:
         st.error("⚠️ Please fix your note before generating — it couldn't be classified into any post type.")
         st.stop()
 
